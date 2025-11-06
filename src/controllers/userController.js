@@ -42,7 +42,19 @@ const register = async (req, res) => {
 
 const getAllUsers = async (req, res) => {
   try {
-    const users = await getUsersCollection().find({}).project({ password: 0 }).toArray()
+    const { search } = req.query
+    let query = {}
+
+    if (search) {
+      query = {
+        $or: [
+          { username: { $regex: search, $options: 'i' } },
+          { email: { $regex: search, $options: 'i' } }
+        ]
+      };
+    }
+
+    const users = await getUsersCollection().find(query).project({ password: 0 }).toArray()
     res.status(200).json(users)
   } catch (error) {
     console.error('Lỗi khi lấy danh sách người dùng:', error)
@@ -83,8 +95,15 @@ const login = async (req, res) => {
 const updateUser = async (req, res) => {
   try {
     const { id } = req.params
-    const { username, email, image } = req.body
+    const { username, email, image, newPassword } = req.body
     const updateData = { username, email, image }
+
+    // Nếu admin muốn thay đổi mật khẩu của user
+    if (newPassword) {
+      const salt = await bcrypt.genSalt(10)
+      const hashedPassword = await bcrypt.hash(newPassword, salt)
+      updateData.password = hashedPassword
+    }
 
     Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key])
 
